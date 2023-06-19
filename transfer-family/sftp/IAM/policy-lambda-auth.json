@@ -1,0 +1,26 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "VisualEditor0",
+            "Effect": "Allow",
+            "Action": [
+                "secretsmanager:GetSecretValue",
+                "logs:CreateLogGroup"
+            ],
+            "Resource": [
+                "arn:aws:secretsmanager:<REGION>:<ACCOUNT_ID>:secret:<TRANSFER_FAMILY_ID>/*",
+                "arn:aws:logs:<REGION>:<ACCOUNT_ID>:*"
+            ]
+        },
+        {
+            "Sid": "VisualEditor1",
+            "Effect": "Allow",
+            "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+            ],
+            "Resource": "arn:aws:logs:<REGION>:<ACCOUNT_ID>:log-group:/<LOG_GROUP_NAME>:*"
+        }
+    ]
+}
