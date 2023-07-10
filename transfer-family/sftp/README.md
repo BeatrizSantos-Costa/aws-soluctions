@@ -63,14 +63,7 @@ Vamos precisar ajustar as permissões no Lambda, pois não adicionamos as permis
 
 ## IAM Policy e Role Usuário
 
-Precisamos criar uma Role e policy nas quais os usuários vão assumir para se conectar ao Transfer Family. 
-
-1. Criação da Policy:
-
-    1.1 IAM > Polices > Create Policy > Clique em "Json" 
-    1.2 Adicione a policy que se encontra no repositório com o nome "policy-tf-user-acess.json".
-    1.3 Policy Name: policy-tf-user-acess
-
+Precisamos criar uma Role e atachar uma policy nas quais os usuários vão assumir para se conectar ao Transfer Family. 
 
 2. Criação da Role:
 
@@ -78,7 +71,7 @@ Precisamos criar uma Role e policy nas quais os usuários vão assumir para se c
     ```
         Selecione: AWS Service
         Use Cases for other AWS Services:  Transfer
-        Policy: policy-tf-user-acess
+        Policy: S3FullAcess
         Role Name: role-tf-user-access
     ```
 
@@ -90,12 +83,9 @@ Precisamos criar uma Role e policy nas quais os usuários vão assumir para se c
 Vamos acessar o Secret Manager, onde vamos adicionar a secret em texto, segue abaixo exemplo de configuração:
 
 1. Secrets Manager > Create Secret > Secret Type: Other type of secret > Adicione o seguinte texto e edite conforme preferir:
+
 ```
-{
-  "Password": "minha-senha-123",
-  "Role": "arn:aws:iam::<account-id>:role/role-tf-user-acess",
-  "HomeDirectory": "bucket_name/diretório-que-vc-quer-criar-no-bucket"
-}
+{"Password":"darede123","Role":"arn:aws:iam::725510651649:role/role-tf-user-acess","HomeDirectoryType":"LOGICAL","HomeDirectoryDetails":"[{\"Entry\": \"/setor1\", \"Target\": \"/bukcet-setores-poc-ost/setor1\"}]"}
 ```
 2. Em Configure Secret, o nome do segredo tem que ser o id do transfer faimly e o usuário, como o exemplo abaixo:
 
