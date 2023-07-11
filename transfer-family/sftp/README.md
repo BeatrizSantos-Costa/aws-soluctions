@@ -85,7 +85,7 @@ Vamos acessar o Secret Manager, onde vamos adicionar a secret em texto, segue ab
 1. Secrets Manager > Create Secret > Secret Type: Other type of secret > Adicione o seguinte texto e edite conforme preferir:
 
 ```
-{"Password":"darede123","Role":"arn:aws:iam::725510651649:role/role-tf-user-acess","HomeDirectoryType":"LOGICAL","HomeDirectoryDetails":"[{\"Entry\": \"/setor1\", \"Target\": \"/bukcet-setores-poc-ost/setor1\"}]"}
+{"Password":"darede123","Role":"arn:aws:iam::ACCOUNT_ID:role/role-tf-user-acess","HomeDirectoryType":"LOGICAL","HomeDirectoryDetails":"[{\"Entry\": \"/setor1\", \"Target\": \"/bukcet-setores-poc-ost/setor1\"}]"}
 ```
 2. Em Configure Secret, o nome do segredo tem que ser o id do transfer faimly e o usuário, como o exemplo abaixo:
 
