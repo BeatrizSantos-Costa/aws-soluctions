@@ -1,0 +1,223 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Template destined for the creation of the Transfer Family (SFTP) using authentication with Lambada + Secret Manager.
+Parameters:
+  CreateServer:
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Type: String
+    Description: Whether this stack creates an AWS Transfer endpoint or not. If the endpoint is created as
+      part of the stack, the custom identity provider is automatically associated with it.
+    Default: 'true'
+  SecretsManagerRegion:
+    Type: String
+    Description: (Optional) The region the secrets are stored in. If this value is not provided, the
+      region this stack is deployed in will be used. Use this field if you are deploying this stack in
+      a region where SecretsManager is not available.
+    Default: ''
+  LambdaName:
+    Type: String
+    Default: LambdaAuth
+    Description: Required if launching a Custom Identity Provider is set to AWS Lambda. The Lambda Alias you would like to identify in the environment. 
+  LambdaRuntime:
+    Type: String
+    Default: python3.11
+    Description: Required if launching a Custom Identity Provider is set to AWS Lambda.  Add an alias for a Lambda function version.
+  S3Bucket:
+    Type: String
+    Default: codigo-lambda-teste
+    Description: The name of the bucket where the Lambda code is stored.
+  S3Key:
+    Type: String
+    Default: lambda-auth.zip
+    Description: The name of the file that is stored in the bucket.
+  LambdaRole:
+    Type: String
+    Default: "RoleLambdaAuth"
+    Description: Name of the role that the Lambda will be executed.
+  RoleUsersAccess:
+    Type: String
+    Default: RoleUserTransferFamily
+    Description:  Name of the role that the user will assume to access the Transfer Family and the bucket.
+  TransferEndpointType:
+    AllowedValues:
+      - 'PUBLIC'
+      - 'VPC'
+    Type: String
+    Default: 'PUBLIC'
+    Description: Select PUBLIC if you want a public facing AWS Transfer endpoint or VPC if you want a VPC
+      based endpoint. Note that only SFTP and FTPS are supported on public endpoints.
+  TransferSubnetIDs:
+    Type: String
+    Default: ''
+    Description: Required if launching a VPC endpoint. Comma-separated list of subnets that you would like
+      the AWS Transfer endpoint to be provisioned into.
+  TransferVPCID:
+    Type: String
+    Default: ''
+    Description: Required if launching a VPC endpoint. The VPC ID that you would like the AWS Transfer endpoint
+      to be provisioned into.
+
+Conditions:
+  CreateServer:
+    Fn::Equals:
+      - Ref: CreateServer
+      - 'true'
+  NotCreateServer:
+    Fn::Not:
+      - Condition: CreateServer
+  SecretsManagerRegionProvided:
+    Fn::Not:
+      - Fn::Equals:
+          - Ref: SecretsManagerRegion
+          - ''
+  TransferVPCEndpoint:
+    Fn::Equals:
+      - Ref: TransferEndpointType
+      - 'VPC'
+
+Outputs:
+  ServerId:
+    Value:
+      Fn::GetAtt: TransferServer.ServerId
+    Condition: CreateServer
+  StackArn:
+    Value:
+      Ref: AWS::StackId
+    Condition: NotCreateServer
+
+Resources:
+  TransferServer:
+    Type: AWS::Transfer::Server
+    Condition: CreateServer
+    Properties:
+      EndpointType:
+        Ref: TransferEndpointType
+      EndpointDetails:
+        Fn::If:
+          - TransferVPCEndpoint
+          - SubnetIds:
+              Fn::Split: [',', Ref: TransferSubnetIDs]
+            VpcId:
+              Ref: TransferVPCID
+          - Ref: AWS::NoValue
+      IdentityProviderDetails:
+        Function:
+          Fn::GetAtt: CustomIdentityProviderLambda.Arn
+      IdentityProviderType: AWS_LAMBDA
+      LoggingRole:
+        Fn::GetAtt: TransferCWLoggingRole.Arn
+
+  TransferCWLoggingRole:
+    Description: IAM role used by Transfer to log API requests to CloudWatch
+    Type: AWS::IAM::Role
+    Condition: CreateServer
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - transfer.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - Fn::Sub: arn:${AWS::Partition}:iam::aws:policy/service-role/AWSTransferLoggingAccess
+  
+  CustomIdentityProviderLambda:
+    Description: A function to lookup and return user data from AWS Secrets Manager
+    Type: AWS::Lambda::Function
+    Properties: 
+      Architectures: 
+        - x86_64
+      Code: 
+        S3Bucket: 
+          Ref: S3Bucket
+        S3Key: 
+          Ref: S3Key
+      FunctionName: 
+        Ref: LambdaName
+      Handler: lambda-auth.lambda_handler
+      Environment:
+        Variables:
+          SecretsManagerRegion:
+            Fn::If:
+              - SecretsManagerRegionProvided
+              - Ref: SecretsManagerRegion
+              - Ref: AWS::Region
+      Runtime:
+        Ref: LambdaRuntime
+      Role: 
+        Fn::GetAtt: LambdaExecutionRole.Arn
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: 
+        Ref: LambdaRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      ManagedPolicyArns:
+      - Fn::Sub: arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+  
+  GetUserConfigLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:invokeFunction
+      FunctionName:
+        Fn::GetAtt: CustomIdentityProviderLambda.Arn
+      Principal:  transfer.amazonaws.com
+      SourceArn:
+        Fn::GetAtt: TransferServer.Arn
+  
+  LambdaPolicyTransferFamily:
+      DependsOn:
+         - "TransferServer"
+         - "CustomIdentityProviderLambda"
+         - "LambdaExecutionRole"
+      Type: AWS::IAM::Policy
+      Properties: 
+        PolicyName: LambdaSecretsPolicy
+        Roles:
+            - Ref: LambdaRole
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - secretsmanager:GetSecretValue
+            Resource:
+              Fn::Sub:
+                - arn:${AWS::Partition}:secretsmanager:${SecretsRegion}:${AWS::AccountId}:secret:${TransferServer.ServerId}/*
+                - SecretsRegion:
+                    Fn::If:
+                      - SecretsManagerRegionProvided
+                      - Ref: SecretsManagerRegion
+                      - Ref: AWS::Region
+
+  RoleUserAccess:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: 
+        Ref: RoleUsersAccess
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - transfer.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      ManagedPolicyArns:
+      - Fn::Sub: arn:${AWS::Partition}:iam::aws:policy/AmazonS3FullAccess  
