@@ -1,2 +1,3 @@
-# aws-soluctions
-Repositório focado em soluções AWS
+# Soluções AWS
+
+Esse repositório tem o intuito de documentar algumas soluções AWS para ajudar outras pessoas. 
