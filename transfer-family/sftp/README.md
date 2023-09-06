@@ -1,106 +1,74 @@
+# Transfer Family
 
-# Transfer Family - Criação de SFTP baseado em nome de usuário e senha utilizando o Lambda
+O projeto foi desenvolvido com o intuito de aplicar o AWS Transfer Family utilizando uma stack de autenticação de usuários com senhas via Lambda.
 
-Vamos aprender como realizar a autenticação de usuários com o Tranfer Family, pois de forma "padrão" ele utiliza o login via chave pública do SSH. 
+[Add imagem]
 
-## Criação Lambda
+## Setup 
 
-O Lambda vai ser o resposnsável por realizar a parte de autenticação, onde o mesmo vai verificar se a autenticação atende todos os requisitos para a atividade.
+- [x] Acesso a AWS Console.
 
-**Configurando o Lambda:**
- * Function Name: ``lambda-auth``
- * Runtime: ``Python 3.10``
- * Architecture: ``x86_64``
- * Execution Role: ``Create a new role with basic Lambda permissions``
-
-> Faça o upload do código que se encontra no repositório.
-
-##  Criação do Transfer Family
-
-O AWS Transfer Family é um serviço de transferência seguro que permite transferir arquivos para dentro e fora dos serviços de armazenamento da AWS. Vamos utilizado para pegar dados localmente e levarmos para o S3. 
-
-**Configurando o Transfer Family:**
- * Chose protocols: ``SFTP`` > ``Next``
- * Choose an Identity Provider: ``Custom Identity Provider`` > AWS Lambda Function: ``lambda-auth`` > ``Next`` 
- * Choose an endpoint: ``Publicly accessible`` > ``Next``
- * Choose a Domain: ``Amazon S3`` > ``Next``
- * Configure additional details: ``As opções Default já são suficientes para essa POC`` > ``Next`` > ``Create``
-
- ## Criação do S3
-
-Nosso serviço de escolhido no Transfer Family é o S3 Bucket. Você pode criar o balde com sua preferência. 
-
-> Minhas sugestões: bloqueie todo o acesso público e ative a criptografia e o controle de versão.
-
-**Configurando o bucket:**
- * Nome do Bucket: ``poc-transfer-family-sftp``
- * ACL: bloqueando ``acesso público``
- * Criptografia: ``Ativo``
- * Controle de Versão: ``Ativo``
-
-## Ajustando Permissões na Lambda
-
-Vamos precisar ajustar as permissões no Lambda, pois não adicionamos as permissões corretas para a execução ser concluída com sucesso. 
-
-1. Navegue até: 
-    Lambda > Configuration > Permissions, scroll to "Resource-based policy" and click on "Add permissions". 
-    
-    ```
-    AWS Serivce
-    Service: Other
-    Statement ID: lambda-auth-invocation-s-d3cf65819e2c47a6b
-    Principal: transfer.amazonaws.com
-    Source ARN: arn:aws:transfer:{REGION}:{ACCOUNT_ID}:server/{SERVER_ID_TF}
-    Action: lambda:InvokeFunction
-    ```
-2. Vamos adicionar permissão na Lambda para ela conseguir acessar o Secret Manager, o código fica no repositório. 
-
-    2.1 Acessar a role da Lambda > Clicar no "+" > Copiar a ARN do CloudWatch Logs
-
-    2.2 Polices > Create Policy > Clique em "Json" > Adicione a policy que se encontra no repositório com o nome "policy-lambda-auth.json"
-
-    2.3 Remover a policy antiga e adicionar a nova
-
-## IAM Policy e Role Usuário
-
-Precisamos criar uma Role e atachar uma policy nas quais os usuários vão assumir para se conectar ao Transfer Family. 
-
-2. Criação da Role:
-
-    2.1 IAM > Roles > Create Role
-    ```
-        Selecione: AWS Service
-        Use Cases for other AWS Services:  Transfer
-        Policy: S3FullAcess
-        Role Name: role-tf-user-access
-    ```
-
-> Após a configuração cópie o ARN, pois iremos utilizar no próximo tópico.
+- [x] [AWS-CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) caso você opte por rodar o projeto pelo terminal.
 
 
-## Criação do usuário 
+## 🛠️ Aplicar a solução
+
+*Para aplicar a solução é necessário estar logado na AWS*
+
+1. Faça o clone do repositório
+2. Acesse a console da AWS e navegue até o recurso S3 (Simple Storage Service)
+3. Crie um bucket e após a criação realizar a subida do código Lambda que se encontra na pasta Lambda. (Vamos usar esse bucket na criação da Stack do CloudFormation)
+4. Navegue até o recurso CloudFormation
+3. Clique em `Create Stack` e escolha a opção `With new resources (standard)`
+4. Em `Prerequisite - Prepare template` selecione a opção `Template is ready`
+5. No campo `Template source` selecione `Upload Template File` e faça o upload do código que se encontra na pasta CloudFormation
+6. Preencha as informações restantes e crie a stack.
+
+
+### Criação do usuário no Secret Manager 
 
 Vamos acessar o Secret Manager, onde vamos adicionar a secret em texto, segue abaixo exemplo de configuração:
 
 1. Secrets Manager > Create Secret > Secret Type: Other type of secret > Adicione o seguinte texto e edite conforme preferir:
 
-```
-{"Password":"darede123","Role":"arn:aws:iam::ACCOUNT_ID:role/role-tf-user-acess","HomeDirectoryType":"LOGICAL","HomeDirectoryDetails":"[{\"Entry\": \"/setor1\", \"Target\": \"/bukcet-setores-poc-ost/setor1\"}]"}
-```
-2. Em Configure Secret, o nome do segredo tem que ser o id do transfer faimly e o usuário, como o exemplo abaixo:
+```json
+{
+ "Password": "MINHASENHA",
+ "Role":"arn:aws:iam::ACCOUNT_ID:role/ROLE-DO-USER",
+ "HomeDirectoryType":"LOGICAL",
+ "HomeDirectoryDetails":"[{\"Entry\": \"/PASTA-DO-BUCKET\", \"Target\": \"/NOME-DO-BUCKET/PASTA-DO-BUCKET \"}]"
+}
 
 ```
-s-d3cf65819e2c47a6b/beatriz
+
+2. Em Configure Secret, o nome do segredo tem que ser o id do Transfer Family e o usuário, como o exemplo abaixo:
+
+
+```
+TRANSFER-FAMILY-ID/USERNAME
 ```
 
 > O restante da configuração pode ser deixada como default
 
 
+### Transferir aquivo utilizando client:
 
-## Validando se deu tudo certo:
+#### CyberDuck
+
+1. Abra o cliente [CyberDuck](https://cyberduck.io/download/).
+2. Escolha `Open Connection`.
+3. Na caixa de diálogo `Open Connection`, escolha `SFTP (SSH File Transfer Protocol)`.
+4. Para `Servidor`, insira o endpoint do seu servidor, ou seja, o endpoint do Transfer Family. **O endpoint do servidor está localizado na interface do Transfer Family**.
+5. Em Número da porta, insira `22` para `SFTP`.
+6. Em `Username`, insira o nome do usuário que você criou no **Secret Manager**.
+7. Em `Password`, insira a senha definida no Secret Manager.
+8. Escolha `Connect`.
+
+
+#### SSH
 
 Acesse o terminal da sua máquina e rode o comando abaixo:
 
-```
-sftp -i transfer-key  USER_NAME@ENDPOINT_TRANSFER_FAMILY
+```shell
+sftp -i transfer-key USER_NAME@ENDPOINT_TRANSFER_FAMILY
 ```
