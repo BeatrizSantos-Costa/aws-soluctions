@@ -2,7 +2,7 @@
 
 O projeto foi desenvolvido com o intuito de aplicar o AWS Transfer Family utilizando uma stack de autenticação de usuários com senhas via Lambda.
 
-[Add imagem]
+![transfer-family](https://github.com/BeatrizSantos-Costa/aws-soluctions/assets/64608296/002b943b-235e-425e-ad8a-d0c5049c13f1)
 
 ## Setup 
 
