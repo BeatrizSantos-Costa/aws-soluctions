@@ -1,0 +1,120 @@
+Description: backup plan template to back up all resources daily.
+Parameters:
+  VaultName: 
+    Type: String
+    Default: 'vault'
+    Description: Name of the AWS Backup Vault where the backups will be stored.
+  BackupPlanName:
+    Type: String
+    Default: 'centralizado-backup-resources'
+    Description: Backup Plan name.
+  SelectionName:
+    Type: String
+    Default: 'centralizado-backup-databases'
+    Description: Backup Rule name. 
+  ScheduleExpression:
+    Type: String
+    Default: "cron(0 23 ? * FRI *)"
+    Description: A CRON expression specifying when AWS Backup initiates a backup job.
+  TimeZone:
+    Type: String
+    Default: "America/Sao_Paulo"
+    Description: Time Zone the rule will run.
+  RetentionAccount:
+    Type: String
+    Default: "1"
+    Description: AWS Backup automatically expires backups according to the lifecycle defined in the origin account.
+  RetentionBackup:
+    Type: String
+    Default: "28"
+    Description: AWS Backup automatically expires backups according to the lifecycle defined in the backup account.
+  StartWindowMinutes:
+    Type: String
+    Default: "480"
+    Description: That specifies a period of time in minutes after a backup is scheduled before a job is canceled if it doesn't start successfully.
+  CompletionWindowMinutes:
+    Type: String
+    Default: "540"
+    Description: A value in minutes after a backup job is successfully started before it must be completed or it is canceled by AWS Backup.
+  TagConditionType:
+    Type: String
+    Default: "STRINGEQUALS"
+    Description: A conditions that you define to assign resources to your backup plans using tags. Conditions supports StringEquals, StringLike, StringNotEquals, and StringNotLike. ListOfTags only supports StringEquals.
+  TagKey:
+    Type: String
+    Default: "Backup"
+    Description: Define Tag Key
+  TagValue:
+    Type: String
+    Default: "Default"
+    Description: Define Tag Value
+  TagKey2:
+    Type: String
+    Default: "Backup"
+    Description: Define Tag Key
+  TagValue2:
+    Type: String
+    Default: "Critico"
+    Description: Define Tag Value
+  ArnVault:
+    Type: String
+    Default: "arn:aws:backup:<REGION>:<ACCOUNT>:<BACKUP-NAME>"
+    Description: Arn Vault key
+    
+Resources:
+  BackupPlanWithDailyBackups:
+    Type: AWS::Backup::BackupPlan
+    Properties:
+      BackupPlan:
+        BackupPlanName: !Ref BackupPlanName
+        BackupPlanRule:
+          -
+            RuleName: !Ref SelectionName
+            TargetBackupVault: !Ref VaultName
+            ScheduleExpression: !Ref ScheduleExpression
+            ScheduleExpressionTimezone: !Ref TimeZone
+            StartWindowMinutes: !Ref StartWindowMinutes
+            CompletionWindowMinutes: !Ref CompletionWindowMinutes
+            CopyActions:
+              - 
+                DestinationBackupVaultArn: !Ref ArnVault
+                Lifecycle:
+                  DeleteAfterDays: !Ref RetentionBackup
+            Lifecycle:
+              DeleteAfterDays: !Ref RetentionAccount
+              
+  
+  BackupRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "backup.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForBackup"
+        - "arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForRestores"
+
+  TagBasedBackupSelection:
+    Type: AWS::Backup::BackupSelection
+    Properties:
+      BackupSelection:
+        SelectionName: !Ref SelectionName
+        IamRoleArn: !GetAtt BackupRole.Arn
+        Resources:
+          - "arn:aws:dynamodb:*:*:table/*"
+          - "arn:aws:rds:*:*:cluster:*"
+          - "arn:aws:rds:*:*:db:*"
+        ListOfTags:
+          - ConditionType: !Ref TagConditionType
+            ConditionKey: !Ref TagKey
+            ConditionValue: !Ref TagValue
+          - ConditionType: !Ref TagConditionType
+            ConditionKey: !Ref TagKey2
+            ConditionValue: !Ref TagValue2            
+      BackupPlanId: !Ref BackupPlanWithDailyBackups
